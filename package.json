@@ -1,6 +1,6 @@
 {
   "name": "@yogeshrathod/bitbucket-mcp",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Model Context Protocol (MCP) server for Bitbucket Cloud and Server API - provides tools for repository info, pull requests, branches, commits, and file operations",
   "type": "module",
   "main": "dist/index.js",
