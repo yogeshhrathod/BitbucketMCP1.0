@@ -625,6 +625,39 @@ async function main() {
     },
   });
 
+  addTool({
+    name: "pr_inline_comment_add",
+    description:
+      "Add an inline comment to a pull request at a specific file and line. Requires workspace, repoSlug, prId, filePath, line, and text parameters. Optional: lineType (ADDED|CONTEXT|REMOVED, default ADDED).",
+    inputSchema: {
+      type: "object",
+      required: ["workspace", "repoSlug", "prId", "filePath", "line", "text"],
+      properties: {
+        workspace: { type: "string" },
+        repoSlug: { type: "string" },
+        prId: { type: "number" },
+        filePath: { type: "string" },
+        line: { type: "number" },
+        text: { type: "string" },
+        lineType: { type: "string", enum: ["ADDED", "CONTEXT", "REMOVED"] },
+      },
+    },
+    handler: async (args: any) => {
+      const w = getDefaultWorkspace(args);
+      const r = getDefaultRepoSlug(args);
+      const data = await client.addInlineCommentAfterReview(
+        w,
+        r,
+        args!.prId as number,
+        args!.filePath as string,
+        args!.line as number,
+        args!.text as string,
+        (args!.lineType as "ADDED" | "CONTEXT" | "REMOVED") || "ADDED"
+      );
+      return { content: jsonOut(data) };
+    },
+  });
+
   const server = new Server(
     { name: "@yogeshrathod/bitbucket-mcp", version: "1.0.1" },
     { capabilities: { tools: {} } }

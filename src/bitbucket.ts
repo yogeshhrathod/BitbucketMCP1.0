@@ -901,4 +901,52 @@ export class BitbucketClient {
       );
     }
   }
+
+  async addInlineCommentAfterReview(
+    workspace: string,
+    repoSlug: string,
+    prId: number,
+    filePath: string,
+    line: number,
+    text: string,
+    lineType: "ADDED" | "CONTEXT" | "REMOVED" = "ADDED"
+  ) {
+    console.log(
+      `[addInlineCommentAfterReview] workspace=${workspace}, repoSlug=${repoSlug}, prId=${prId}, file=${filePath}, line=${line}, lineType=${lineType}`
+    );
+    if (this.isCloud) {
+      const body = {
+        content: { raw: text },
+        inline: { path: filePath, to: line },
+      };
+      return this.request(
+        `/repositories/${encodeURIComponent(workspace)}/${encodeURIComponent(
+          repoSlug
+        )}/pullrequests/${prId}/comments`,
+        {
+          method: "POST",
+          body: JSON.stringify(body),
+        }
+      );
+    } else {
+      const body = {
+        text,
+        anchor: {
+          line,
+          lineType,
+          fileType: "TO",
+          path: filePath,
+        },
+      };
+      return this.request(
+        `/projects/${encodeURIComponent(workspace)}/repos/${encodeURIComponent(
+          repoSlug
+        )}/pull-requests/${prId}/comments`,
+        {
+          method: "POST",
+          body: JSON.stringify(body),
+        }
+      );
+    }
+  }
 }

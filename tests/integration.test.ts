@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from "vitest";
 import nock from "nock";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -25,11 +25,21 @@ describe("MCP Server Integration Tests", () => {
   });
 
   describe("Config Loading", () => {
+    const prevEnv = { ...process.env };
+
+    beforeAll(() => {
+      process.env.ATLASSIAN_USER_EMAIL = "integration@example.com";
+      process.env.ATLASSIAN_API_TOKEN = "integration-test-token";
+      process.env.ATLASSIAN_SITE_URL = "bitbucket";
+      process.env.BITBUCKET_DEFAULT_DEST_BRANCH = "main";
+    });
+
+    afterAll(() => {
+      process.env = { ...prevEnv };
+    });
+
     it("loads config successfully", () => {
-      // This test verifies that the config loading mechanism works
-      // In a real scenario, environment variables or .env file would be set
       expect(() => {
-        // This should not throw if environment variables are set (from shell or .env)
         loadConfig();
       }).not.toThrow();
     });
