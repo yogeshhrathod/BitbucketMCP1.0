@@ -40,12 +40,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yogeshhrathod/BitbucketMCP1.0/.git"
+    "url": "https://github.com/yogeshhrathod/BitbucketMCP1.0"
   },
   "bugs": {
-    "url": "https://github.com/yogeshhrathod/BitbucketMCP1.0//issues"
+    "url": "https://github.com/yogeshhrathod/BitbucketMCP1.0/issues"
   },
-  "homepage": "https://github.com/yogeshhrathod/BitbucketMCP1.0/#readme",
+  "homepage": "https://github.com/yogeshhrathod/BitbucketMCP1.0#readme",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
     "axios": "^1.7.7",
