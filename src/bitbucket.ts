@@ -949,4 +949,342 @@ export class BitbucketClient {
       );
     }
   }
+
+  async getPullRequestDiffFile(
+    workspace: string,
+    repoSlug: string,
+    prId: number,
+    filePath: string,
+    contextLines: number = 3
+  ): Promise<{
+    pull_request_id: number;
+    file_path: string;
+    context_lines: number;
+    diff: string | null;
+    truncated: boolean;
+    message?: string;
+  }> {
+    console.log(
+      `[getPullRequestDiffFile] workspace=${workspace}, repoSlug=${repoSlug}, prId=${prId}, filePath=${filePath}, contextLines=${contextLines}`
+    );
+
+    if (!filePath || filePath.trim() === "") {
+      throw new BitbucketError({
+        message: "file_path parameter cannot be empty",
+        statusCode: 400,
+        errorType: "VALIDATION_ERROR",
+        details: { filePath },
+        suggestion: "Provide a valid file path",
+        isRetryable: false,
+      });
+    }
+
+    if (filePath.includes("..")) {
+      throw new BitbucketError({
+        message: "file_path contains invalid path traversal sequence (..)",
+        statusCode: 400,
+        errorType: "VALIDATION_ERROR",
+        details: { filePath },
+        suggestion: "Remove '..' from the file path",
+        isRetryable: false,
+      });
+    }
+
+    if (this.isCloud) {
+      try {
+        const pr = await this.getPullRequest(workspace, repoSlug, prId);
+        const sourceHash = (pr as any).source?.commit?.hash;
+        const destHash = (pr as any).destination?.commit?.hash;
+
+        if (!sourceHash || !destHash) {
+          throw new BitbucketError({
+            message: "Unable to extract commit hashes from PR",
+            statusCode: 500,
+            errorType: "INVALID_PR_DATA",
+            details: { pr },
+            suggestion: "PR may be in an invalid state",
+            isRetryable: false,
+          });
+        }
+
+        const params = new URLSearchParams({
+          path: filePath,
+          context: contextLines.toString(),
+          topic: "true",
+        });
+
+        const diffPath = `/repositories/${encodeURIComponent(
+          workspace
+        )}/${encodeURIComponent(
+          repoSlug
+        )}/diff/${encodeURIComponent(sourceHash)}..${encodeURIComponent(
+          destHash
+        )}?${params.toString()}`;
+
+        const diff = await this.request<string>(diffPath);
+
+        if (!diff || (typeof diff === "string" && diff.trim() === "")) {
+          return {
+            pull_request_id: prId,
+            file_path: filePath,
+            context_lines: contextLines,
+            diff: null,
+            truncated: false,
+            message: "File not found in this PR's diff",
+          };
+        }
+
+        return {
+          pull_request_id: prId,
+          file_path: filePath,
+          context_lines: contextLines,
+          diff: typeof diff === "string" ? diff : JSON.stringify(diff),
+          truncated: false,
+        };
+      } catch (error: any) {
+        if (error instanceof BitbucketError && error.statusCode === 404) {
+          return {
+            pull_request_id: prId,
+            file_path: filePath,
+            context_lines: contextLines,
+            diff: null,
+            truncated: false,
+            message: "File not found in repository",
+          };
+        }
+        throw error;
+      }
+    } else {
+      const pathSegments = filePath.split("/");
+      const encodedPath = pathSegments
+        .map((segment) => encodeURIComponent(segment))
+        .join("/");
+
+      const params = new URLSearchParams({
+        contextLines: contextLines.toString(),
+        whitespace: "IGNORE_ALL",
+      });
+
+      const diffPath = `/projects/${encodeURIComponent(
+        workspace
+      )}/repos/${encodeURIComponent(
+        repoSlug
+      )}/pull-requests/${prId}/diff/${encodedPath}?${params.toString()}`;
+
+      try {
+        const diff = await this.request<any>(diffPath);
+
+        if (!diff || (typeof diff === "string" && diff.trim() === "")) {
+          return {
+            pull_request_id: prId,
+            file_path: filePath,
+            context_lines: contextLines,
+            diff: null,
+            truncated: false,
+            message: "File not found in this PR's diff",
+          };
+        }
+
+        return {
+          pull_request_id: prId,
+          file_path: filePath,
+          context_lines: contextLines,
+          diff: typeof diff === "string" ? diff : JSON.stringify(diff),
+          truncated: false,
+        };
+      } catch (error: any) {
+        if (error instanceof BitbucketError && error.statusCode === 404) {
+          return {
+            pull_request_id: prId,
+            file_path: filePath,
+            context_lines: contextLines,
+            diff: null,
+            truncated: false,
+            message: "File not found in repository",
+          };
+        }
+        throw error;
+      }
+    }
+  }
+
+  async createTaskWithInlineComment(
+    workspace: string,
+    repoSlug: string,
+    prId: number,
+    filePath: string,
+    lineNumber: number,
+    lineType: "ADDED" | "REMOVED" | "CONTEXT",
+    commentText: string,
+    taskText?: string
+  ): Promise<
+    | {
+        status: "success";
+        comment_id: number;
+        task_id: number;
+        file_path: string;
+        line_number: number;
+        line_type: string;
+      }
+    | {
+        status: "partial";
+        comment_id: number;
+        task_id: null;
+        task_error: string;
+        file_path: string;
+        line_number: number;
+        line_type: string;
+      }
+  > {
+    console.log(
+      `[createTaskWithInlineComment] workspace=${workspace}, repoSlug=${repoSlug}, prId=${prId}, filePath=${filePath}, lineNumber=${lineNumber}, lineType=${lineType}, isCloud=${this.isCloud}`
+    );
+
+    const validLineTypes = ["ADDED", "REMOVED", "CONTEXT"];
+    if (!validLineTypes.includes(lineType)) {
+      throw new BitbucketError({
+        message: `Invalid line_type: ${lineType}. Must be one of: ADDED, REMOVED, CONTEXT`,
+        statusCode: 400,
+        errorType: "VALIDATION_ERROR",
+        details: { lineType, validLineTypes },
+        suggestion: "Use ADDED, REMOVED, or CONTEXT for line_type",
+        isRetryable: false,
+      });
+    }
+
+    try {
+      if (this.isCloud) {
+        // Bitbucket Cloud: Create inline comment first
+        const commentBody = {
+          content: {
+            raw: commentText,
+          },
+          inline: {
+            to: lineNumber,
+            path: filePath,
+          },
+        };
+
+        const commentResponse = await this.request<any>(
+          `/repositories/${encodeURIComponent(
+            workspace
+          )}/${encodeURIComponent(repoSlug)}/pullrequests/${prId}/comments`,
+          {
+            method: "POST",
+            body: JSON.stringify(commentBody),
+          }
+        );
+
+        const commentId = commentResponse.id;
+
+        if (!commentId) {
+          throw new BitbucketError({
+            message: "Comment created but no ID returned",
+            statusCode: 500,
+            errorType: "INVALID_RESPONSE",
+            details: { commentResponse },
+            suggestion: "Check API response format",
+            isRetryable: false,
+          });
+        }
+
+        // Bitbucket Cloud: Create task with comment reference
+        try {
+          const taskBody = {
+            content: {
+              raw: taskText || commentText,
+            },
+            comment: {
+              id: commentId,
+            },
+          };
+
+          const taskResponse = await this.request<any>(
+            `/repositories/${encodeURIComponent(
+              workspace
+            )}/${encodeURIComponent(repoSlug)}/pullrequests/${prId}/tasks`,
+            {
+              method: "POST",
+              body: JSON.stringify(taskBody),
+            }
+          );
+
+          const taskId = taskResponse.id;
+
+          return {
+            status: "success",
+            comment_id: commentId,
+            task_id: taskId,
+            file_path: filePath,
+            line_number: lineNumber,
+            line_type: lineType,
+          };
+        } catch (taskError: any) {
+          const errorMessage =
+            taskError instanceof BitbucketError
+              ? taskError.message
+              : String(taskError?.message || taskError);
+
+          return {
+            status: "partial",
+            comment_id: commentId,
+            task_id: null,
+            task_error: errorMessage,
+            file_path: filePath,
+            line_number: lineNumber,
+            line_type: lineType,
+          };
+        }
+      } else {
+        // Bitbucket Server/Data Center: Create blocker comment (replaces deprecated tasks API)
+        // Since Bitbucket Server 7.2+, tasks are managed as comments with severity: BLOCKER
+        const commentBody = {
+          text: taskText || commentText,
+          severity: "BLOCKER",
+          anchor: {
+            line: lineNumber,
+            lineType,
+            fileType: "TO",
+            path: filePath,
+            srcPath: filePath,
+          },
+        };
+
+        const commentResponse = await this.request<any>(
+          `/projects/${encodeURIComponent(
+            workspace
+          )}/repos/${encodeURIComponent(repoSlug)}/pull-requests/${prId}/comments`,
+          {
+            method: "POST",
+            body: JSON.stringify(commentBody),
+          }
+        );
+
+        const commentId = commentResponse.id;
+
+        if (!commentId) {
+          throw new BitbucketError({
+            message: "Blocker comment created but no ID returned",
+            statusCode: 500,
+            errorType: "INVALID_RESPONSE",
+            details: { commentResponse },
+            suggestion: "Check API response format",
+            isRetryable: false,
+          });
+        }
+
+        // Return success with comment ID as task ID (blocker comments replace tasks)
+        return {
+          status: "success",
+          comment_id: commentId,
+          task_id: commentId,
+          file_path: filePath,
+          line_number: lineNumber,
+          line_type: lineType,
+        };
+      }
+    } catch (error: any) {
+      throw error;
+    }
+  }
 }

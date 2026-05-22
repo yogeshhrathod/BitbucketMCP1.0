@@ -123,20 +123,23 @@ All repository-specific tools require `workspace` and `repoSlug` parameters.
 
 ### Pull Requests
 
-| Tool               | Description                 | Parameters                                                                          |
-| ------------------ | --------------------------- | ----------------------------------------------------------------------------------- |
-| `pr_list`          | List pull requests          | `workspace`, `repoSlug`, `state?` (OPEN\|MERGED\|DECLINED\|SUPERSEDED)              |
-| `pr_create`        | Create a pull request       | `workspace`, `repoSlug`, `title`, `sourceBranch?`, `destBranch?`, `description?`    |
-| `pr_get`           | Get PR details              | `workspace`, `repoSlug`, `prId`                                                     |
-| `pr_update`        | Update PR title/description | `workspace`, `repoSlug`, `prId`, `title?`, `description?`                           |
-| `pr_diff`          | Get PR diff                 | `workspace`, `repoSlug`, `prId`                                                     |
-| `pr_changes`       | Get file changes in PR      | `workspace`, `repoSlug`, `prId`                                                     |
-| `pr_approve`       | Approve a PR                | `workspace`, `repoSlug`, `prId`                                                     |
-| `pr_decline`       | Decline/reject a PR         | `workspace`, `repoSlug`, `prId`                                                     |
-| `pr_merge`         | Merge a PR                  | `workspace`, `repoSlug`, `prId`, `closeSourceBranch?`, `mergeStrategy?`, `message?` |
-| `pr_comment_add`   | Add comment to PR           | `workspace`, `repoSlug`, `prId`, `text`                                             |
-| `pr_comments_list` | List PR comments            | `workspace`, `repoSlug`, `prId`                                                     |
-| `pr_reviewers_add` | Add reviewers to PR         | `workspace`, `repoSlug`, `prId`, `reviewers` (array)                                |
+| Tool                     | Description                          | Parameters                                                                          |
+| ------------------------ | ------------------------------------ | ----------------------------------------------------------------------------------- |
+| `pr_list`                | List pull requests                   | `workspace`, `repoSlug`, `state?` (OPEN\|MERGED\|DECLINED\|SUPERSEDED)              |
+| `pr_create`              | Create a pull request                | `workspace`, `repoSlug`, `title`, `sourceBranch?`, `destBranch?`, `description?`    |
+| `pr_get`                 | Get PR details                       | `workspace`, `repoSlug`, `prId`                                                     |
+| `pr_update`              | Update PR title/description          | `workspace`, `repoSlug`, `prId`, `title?`, `description?`                           |
+| `pr_diff`                | Get PR diff                          | `workspace`, `repoSlug`, `prId`                                                     |
+| `pr_diff_file`           | Get per-file PR diff (avoids 2MB limit) | `workspace`, `repoSlug`, `prId`, `file_path`, `context_lines?` (default 3)          |
+| `pr_changes`             | Get file changes in PR               | `workspace`, `repoSlug`, `prId`                                                     |
+| `pr_approve`             | Approve a PR                         | `workspace`, `repoSlug`, `prId`                                                     |
+| `pr_decline`             | Decline/reject a PR                  | `workspace`, `repoSlug`, `prId`                                                     |
+| `pr_merge`               | Merge a PR                           | `workspace`, `repoSlug`, `prId`, `closeSourceBranch?`, `mergeStrategy?`, `message?` |
+| `pr_comment_add`         | Add comment to PR                    | `workspace`, `repoSlug`, `prId`, `text`                                             |
+| `pr_comments_list`       | List PR comments                     | `workspace`, `repoSlug`, `prId`                                                     |
+| `pr_reviewers_add`       | Add reviewers to PR                  | `workspace`, `repoSlug`, `prId`, `reviewers` (array)                                |
+| `pr_inline_comment_add`  | Add inline comment at specific line  | `workspace`, `repoSlug`, `prId`, `filePath`, `line`, `text`, `lineType?`            |
+| `pr_task_add`            | Create inline comment with task      | `workspace`, `repoSlug`, `prId`, `file_path`, `line_number`, `line_type`, `comment_text`, `task_text?` |
 
 ### Branches
 
@@ -219,6 +222,41 @@ All repository-specific tools require `workspace` and `repoSlug` parameters.
   }
 }
 ```
+
+### Get Per-File PR Diff
+
+```json
+{
+  "tool": "pr_diff_file",
+  "arguments": {
+    "workspace": "my-workspace",
+    "repoSlug": "my-repo",
+    "prId": 123,
+    "file_path": "src/components/App.tsx",
+    "context_lines": 5
+  }
+}
+```
+
+### Create Inline Comment with Task
+
+```json
+{
+  "tool": "pr_task_add",
+  "arguments": {
+    "workspace": "my-workspace",
+    "repoSlug": "my-repo",
+    "prId": 123,
+    "file_path": "src/utils/helper.js",
+    "line_number": 42,
+    "line_type": "ADDED",
+    "comment_text": "Please add error handling here",
+    "task_text": "Add error handling"
+  }
+}
+```
+
+**Note**: `pr_task_add` creates a blocker comment on Bitbucket Server/Data Center and a task on Bitbucket Cloud.
 
 ## Development
 

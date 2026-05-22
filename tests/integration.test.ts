@@ -111,6 +111,66 @@ describe("MCP Server Integration Tests", () => {
       expect(result.success).toBe(true);
       expect(result.error).toBeUndefined();
     });
+
+    it("successfully gets per-file PR diff", async () => {
+      // Mock PR details
+      nock(baseUrl)
+        .get("/repositories/test-workspace/test-repo/pullrequests/1")
+        .reply(200, {
+          id: 1,
+          source: { commit: { hash: "source123" } },
+          destination: { commit: { hash: "dest456" } },
+        });
+
+      // Mock diff request
+      nock(baseUrl)
+        .get("/repositories/test-workspace/test-repo/diff/source123..dest456")
+        .query({ path: "src/app.js", context: "5", topic: "true" })
+        .reply(200, "@@ -1,5 +1,5 @@\n-old line\n+new line");
+
+      const result = await client.getPullRequestDiffFile(
+        "test-workspace",
+        "test-repo",
+        1,
+        "src/app.js",
+        5
+      );
+
+      expect(result.pull_request_id).toBe(1);
+      expect(result.file_path).toBe("src/app.js");
+      expect(result.context_lines).toBe(5);
+      expect(result.diff).toContain("old line");
+      expect(result.truncated).toBe(false);
+    });
+
+    it("successfully creates inline comment with task", async () => {
+      // Mock comment creation
+      nock(baseUrl)
+        .post("/repositories/test-workspace/test-repo/pullrequests/1/comments")
+        .reply(200, { id: 100 });
+
+      // Mock task creation
+      nock(baseUrl)
+        .post("/repositories/test-workspace/test-repo/pullrequests/1/tasks")
+        .reply(200, { id: 200 });
+
+      const result = await client.createTaskWithInlineComment(
+        "test-workspace",
+        "test-repo",
+        1,
+        "src/app.js",
+        10,
+        "ADDED",
+        "Please fix this issue"
+      );
+
+      expect(result.status).toBe("success");
+      expect(result.comment_id).toBe(100);
+      expect(result.task_id).toBe(200);
+      expect(result.file_path).toBe("src/app.js");
+      expect(result.line_number).toBe(10);
+      expect(result.line_type).toBe("ADDED");
+    });
   });
 
   describe("MCP Server Integration", () => {
@@ -138,6 +198,21 @@ describe("MCP Server Integration Tests", () => {
         getFileContent: vi.fn().mockResolvedValue("file content"),
         testConnection: vi.fn().mockResolvedValue(true),
         listCommits: vi.fn().mockResolvedValue({ values: [] }),
+        getPullRequestDiffFile: vi.fn().mockResolvedValue({
+          pull_request_id: 1,
+          file_path: "src/file.js",
+          context_lines: 3,
+          diff: "diff content",
+          truncated: false,
+        }),
+        createTaskWithInlineComment: vi.fn().mockResolvedValue({
+          status: "success",
+          comment_id: 100,
+          task_id: 200,
+          file_path: "src/file.js",
+          line_number: 10,
+          line_type: "ADDED",
+        }),
       };
 
       // Test tool handlers directly
