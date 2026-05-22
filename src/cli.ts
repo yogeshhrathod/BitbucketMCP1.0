@@ -658,6 +658,78 @@ async function main() {
     },
   });
 
+  addTool({
+    name: "pr_diff_file",
+    description:
+      "Get per-file diff for a pull request to avoid 2MB bulk diff limit. Requires workspace, repoSlug, prId, and file_path parameters. Optional: context_lines (default 3).",
+    inputSchema: {
+      type: "object",
+      required: ["workspace", "repoSlug", "prId", "file_path"],
+      properties: {
+        workspace: { type: "string" },
+        repoSlug: { type: "string" },
+        prId: { type: "number" },
+        file_path: { type: "string" },
+        context_lines: { type: "number" },
+      },
+    },
+    handler: async (args: any) => {
+      const w = getDefaultWorkspace(args);
+      const r = getDefaultRepoSlug(args);
+      const data = await client.getPullRequestDiffFile(
+        w,
+        r,
+        args!.prId as number,
+        args!.file_path as string,
+        (args?.context_lines as number) || 3
+      );
+      return { content: jsonOut(data) };
+    },
+  });
+
+  addTool({
+    name: "pr_task_add",
+    description:
+      "Create an inline comment with a task in one call. Requires workspace, repoSlug, prId, file_path, line_number, line_type, and comment_text. Optional: task_text (defaults to comment_text).",
+    inputSchema: {
+      type: "object",
+      required: [
+        "workspace",
+        "repoSlug",
+        "prId",
+        "file_path",
+        "line_number",
+        "line_type",
+        "comment_text",
+      ],
+      properties: {
+        workspace: { type: "string" },
+        repoSlug: { type: "string" },
+        prId: { type: "number" },
+        file_path: { type: "string" },
+        line_number: { type: "number" },
+        line_type: { type: "string", enum: ["ADDED", "REMOVED", "CONTEXT"] },
+        comment_text: { type: "string" },
+        task_text: { type: "string" },
+      },
+    },
+    handler: async (args: any) => {
+      const w = getDefaultWorkspace(args);
+      const r = getDefaultRepoSlug(args);
+      const data = await client.createTaskWithInlineComment(
+        w,
+        r,
+        args!.prId as number,
+        args!.file_path as string,
+        args!.line_number as number,
+        args!.line_type as "ADDED" | "REMOVED" | "CONTEXT",
+        args!.comment_text as string,
+        args?.task_text as string | undefined
+      );
+      return { content: jsonOut(data) };
+    },
+  });
+
   const server = new Server(
     { name: "@yogeshrathod/bitbucket-mcp", version: "1.0.1" },
     { capabilities: { tools: {} } }
