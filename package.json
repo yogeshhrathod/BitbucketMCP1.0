@@ -40,12 +40,16 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yogeshhrathod/BitbucketMCP1.0"
+    "url": "git+https://github.com/yogeshhrathod/BitbucketMCP1.0.git"
   },
   "bugs": {
     "url": "https://github.com/yogeshhrathod/BitbucketMCP1.0/issues"
   },
   "homepage": "https://github.com/yogeshhrathod/BitbucketMCP1.0#readme",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
     "axios": "^1.7.7",
